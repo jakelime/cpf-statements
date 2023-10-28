@@ -34,7 +34,6 @@ class CPF2014AndBefore(CPFStatement):
         self.parse_text_file()
 
     def parse_text_file(self):
-        headers = []
         datarows = []
         with open(self.filepath, "r") as reader:
             for i, line in enumerate(reader.readlines()):
@@ -46,8 +45,6 @@ class CPF2014AndBefore(CPFStatement):
                         self.statement_date = datetime.datetime(
                             year=int(line.split(" ")[-1]), month=12, day=31
                         )
-                    # case 2 | 3:
-                    #     headers.append(line)
                     case _:
                         datarows.append(line)
 
@@ -57,106 +54,74 @@ class CPF2014AndBefore(CPFStatement):
     def algorithm_find_left_alignment(
         self, rows: list[str], until_column_keyword: str = "ref"
     ):
-        row = rows[0]
-        ## Double pointer
+        ## Double pointer algorithm
         indices = []
-        words = []
-        print(f"{row=}")
-        found_space = False
-        ptr1, ptr2 = 0, 1
-        while ptr1 < len(row) and ptr2 < len(row):
-            word = []
-            char_first_index = ptr1
-            word.append(row[ptr1])
-            while ptr2 < len(row):
-                char_next = row[ptr2]
-                if not found_space and char_next != " ":
-                    word.append(char_next)
-                elif not found_space and char_next == " ":
-                    word.append(char_next)
-                    found_space = True
-                elif found_space and char_next == " ":
-                    word.append(char_next)
-                elif found_space and char_next != " ":
-                    ptr1 = ptr2
-                    ptr2 += 1
-                    found_space = False
-                    break
-                ptr2 += 1
-            word = "".join(word)
-            words.append(word)
-            indices.append((char_first_index, ptr2))
-            if word.strip().lower() == until_column_keyword:
+        headers = []
+        datarows = []
+        for i, row in enumerate(rows):
+            if not row:
                 break
+            n = len(row)
+            if i == 0:
+                found_double_space = False
+                ptr0 = 0
 
-        print(f"{words=}")
-        [print(x) for x in indices]
-        # [print(row) for row in rows]
+                while ptr0 < n - 1:
+                    char_first_index = ptr0
+                    word = []
+                    c0 = row[ptr0]
+                    word.append(c0)
 
-    def algorithm_text_table_data1(self, rows: list[str]):
-        indices = []
-        words = []
-        for row in rows:
-            print(f"{row=}")
-            iterchar = iter(row)
+                    found_double_space = False
+                    ptr1 = ptr0 + 1
+                    while ptr1 < n - 1:
+                        c1 = row[ptr1]
+                        c2 = row[ptr1 + 1]
 
-            word = []
-            counter = 0
-            number_of_spaces = 0
+                        if c1 == " " and c2 == " ":
+                            found_double_space = True
 
-            c = next(iterchar)
-            counter += 1
-            while True:
-                try:
-                    if c != " ":
-                        word.append(c)
-                        c = next(iterchar)
-                        counter += 1
-                        continue
-                    elif c == " " and number_of_spaces <= 0:
-                        number_of_spaces += 1
-                        c_next = next(iterchar)
-                        counter += 1
-                        if c_next == " ":
-                            number_of_spaces += 1
-                            continue
-                        else:
-                            c = c_next
-                            number_of_spaces = 0
-
-                    else:
-                        words.append("".join(word))
-                        word = []
-                        indices.append(counter - 2)
-                        number_of_spaces = 0
-
-                        try:
-                            c = next(iterchar)
-                            counter += 1
-                            while c == " ":
-                                c = next(iterchar)
-                                counter += 1
-                                continue
-                        except StopIteration:
+                        elif found_double_space and c1 != " ":
+                            ptr0 = ptr1 - 1
+                            ptr1 = ptr0
+                            word = "".join(word)
+                            headers.append(word)
+                            word = []
+                            found_double_space = False
+                            indices.append((char_first_index, ptr0 + 1))
                             break
+                        else:
+                            word.append(c1)
 
-                except StopIteration:
-                    break
+                        ptr1 += 1
 
-            print(f"{indices=}")
-            print(f"{words=}")
-            for i in range(len(indices)):
-                if i == 0:
-                    start = 0
-                    # end = indices[i]
-                    # print(f"[{start=},{end=}] {row[start:end]=}")
-                else:
-                    start = indices[i - 1]
-                end = indices[i]
-                print(f"[{start=},{end=}] {row[start:end]=}")
+                    ptr0 += 1
 
-            break
-        # [print(x) for x in rows]
+                    if ptr1 == n - 1:
+                        # Handles the last case, where there are not double spaces behind
+                        word.append(row[ptr1])
+                        word = "".join(word)
+                        headers.append(word)
+                        indices.append((char_first_index, ptr1 + 1))
+                        break
+
+                    if headers[-1].strip().lower() == until_column_keyword:
+                        break
+
+            elif i == 1:
+                # 2nd row of column, throw away
+                continue
+
+            else:
+                if not indices:
+                    raise RuntimeError("no indices detected from headers")
+                data = {}
+                for header, (x, y) in zip(headers, indices):
+                    data[header.strip().lower()] = row[x:y].strip()
+                datarows.append(data)
+
+        df = pd.DataFrame(datarows)
+        return df
 
     def detect_column_indices(self, row: str) -> tuple[int, ...]:
         return (1, 1)
