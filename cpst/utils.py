@@ -2,6 +2,7 @@ import tempfile
 import logging
 
 from pathlib import Path
+from typing import Any
 
 
 def init_logger(
@@ -62,6 +63,9 @@ class PathFinder:
             self.cwd = self.cwd / resources_foldername
             if not self.cwd.is_dir():
                 raise NotADirectoryError(f"{resources_foldername=}")
+
+    # def __call__(self) -> Path:
+    #     return self.cwd
 
     def get_csv_files(self) -> list[Path]:
         files = [x for x in self.cwd.glob("*.[cC][sS][vV]")]
